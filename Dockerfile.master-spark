@@ -1,0 +1,19 @@
+# Use the official Apache Spark image
+FROM bitnami/spark:3.1.2
+
+# Switch to root to install dependencies
+USER root
+
+# Set the working directory
+WORKDIR /
+
+# Copy requirements file and install Python dependencies
+COPY ./libs.txt .
+RUN pip install --no-cache-dir --timeout=300 -r libs.txt
+
+# Copy Spark job code and any other necessary files
+COPY ./spark /
+
+# Copy the JDBC connector jar
+COPY ./jars/mysql-connector-j-9.3.0.jar /
+

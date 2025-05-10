@@ -1,0 +1,19 @@
+FROM apache/airflow:2.8.0-python3.9
+
+USER root
+RUN apt-get update && \
+    apt-get install -y \
+        default-libmysqlclient-dev \
+        gcc \
+        openjdk-17-jdk && \
+    apt-get clean
+
+USER airflow
+RUN pip install --no-cache-dir \
+    apache-airflow[celery]==2.8.0 \
+    pyspark==3.5.0 \
+    mysql-connector-python==8.1.0
+
+COPY ./dags /opt/airflow/dags
+
+WORKDIR /opt/airflow

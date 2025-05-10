@@ -1,0 +1,10 @@
+[
+    {
+      "bash":"/app/bin/flume-ng",
+      "agent":"",
+      "--name":"$FLUME_AGENT",
+      "--conf":"/config/",
+      "-z":"192.168.88.219:2181,192.168.88.220:2181",
+      "-p":"/flume"
+    }
+  ]
