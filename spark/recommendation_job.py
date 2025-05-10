@@ -21,7 +21,7 @@ jdbc_url = "jdbc:mysql://mysql:3306/dari_db"
 print("Loading data from MySQL...")
 interaction_df = spark.read.jdbc(
     url=jdbc_url,
-    table="userInteraction",
+    table="user_interaction",
     properties=db_properties
 )
 
