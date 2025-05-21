@@ -1,25 +1,24 @@
-from airflow import DAG
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
-from datetime import datetime, timedelta
+FROM python:3.9-slim
 
-default_args = {
-    'owner': 'airflow',
-    'start_date': datetime(2025, 1, 1),
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
-}
+# Install Java (required for spark-submit)
+RUN apt-get update && apt-get install -y openjdk-11-jre-headless && rm -rf /var/lib/apt/lists/*
 
-with DAG(
-    'recommendation_pipeline',
-    default_args=default_args,
-    schedule_interval='@hourly',
-    catchup=False,
-) as dag:
+# Set JAVA_HOME environment variable
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV PATH="$JAVA_HOME/bin:$PATH"
 
-    submit_job = SparkSubmitOperator(
-        task_id='run_recommendation_job',
-        application='/opt/airflow/dags/recommendation_job.py',  # Ensure this path is correct
-        conn_id=None,  # Not required unless using a specific Spark connection in Airflow
-        conf={'spark.master': 'spark://spark-master:7077'},  # Define the Spark master URL
-        verbose=True,
-    )
+# Copy your flow and setup script
+COPY recommendation_pipeline.py /opt/airflow/dags/recommendation_pipeline.py
+COPY setup.sh /setup.sh
+
+# Make setup script executable
+RUN chmod +x /setup.sh
+
+# Install Prefect
+RUN pip install prefect
+
+# Expose Prefect Orion UI port
+EXPOSE 4200
+
+# Run the setup script on container start
+CMD ["/setup.sh"]

@@ -1,19 +1,25 @@
 FROM apache/airflow:2.8.0-python3.9
 
 USER root
-RUN apt-get update && \
-    apt-get install -y \
-        default-libmysqlclient-dev \
-        gcc \
-        openjdk-17-jdk && \
-    apt-get clean
+
+RUN apt-get update && apt-get install -y default-libmysqlclient-dev gcc openjdk-17-jdk && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH="$JAVA_HOME/bin:$PATH"
 
 USER airflow
-RUN pip install --no-cache-dir \
-    apache-airflow[celery]==2.8.0 \
-    pyspark==3.5.0 \
-    mysql-connector-python==8.1.0
+
+RUN pip install --upgrade pip setuptools wheel
 
 COPY ./dags /opt/airflow/dags
 
+USER root
+
+COPY entryPoint.sh /entrypoint.sh
+RUN chmod 755 /entrypoint.sh
+
 WORKDIR /opt/airflow
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+USER airflow

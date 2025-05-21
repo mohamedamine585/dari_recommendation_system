@@ -72,7 +72,7 @@ try:
         titre VARCHAR(100) NOT NULL,
         description TEXT,
         prix FLOAT NOT NULL,
-        lease_duration INT,
+        lease_duration VARCHAR(50),
         type VARCHAR(50),
         rooms VARCHAR(50),
         latitude DOUBLE,
@@ -122,7 +122,7 @@ try:
 
     print(f"\n=== Inserting {num_users} Users ===")
     user_ids = []
-    roles = ['USER', 'ADMIN', 'MODERATOR']
+    roles = ['ROLE_USER', 'ROLE_ADMIN']
     for i in range(num_users):
         username = faker.unique.user_name()
         password = 'password123'
@@ -144,11 +144,12 @@ try:
             """, (user_id, role))
         print(f"Created user {i+1}/{num_users}: {username} with roles {', '.join(user_roles)}")
 
-    TYPE_ANNONCE = ['VENTE', 'LOCATION', 'ECHANGE']
+    TYPE_ANNONCE = ['VENTE', 'LOCATION']
     STATUS_ANNONCE = ['ACTIVE', 'INACTIVE', 'EN_ATTENTE']
     TYPE_BIEN = ['ANY', 'APARTMENT', 'HOUSE', 'VILLA', 'STUDIO', 'CONDO', 'TOWNHOUSE', 'PENTHOUSE', 'DUPLEX', 'LOFT', 'BUNGALOW', 'FARMHOUSE', 'COTTAGE']
-    ROOMS = ['ANY', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE']
-    LEASE_DURATIONS = [1, 3, 6, 12, 24]
+    ROOMS = ['ANY', 'S1', 'S2', 'S3', 'S4', 'S5']
+    LEASE_DURATIONS = ['ANY', 'DAY', 'WEEK', 'MONTH', 'SEMESTER', 'QUARTER', 'YEAR', 'FLEXIBLE']
+
 
     print(f"\n=== Inserting Annonces ===")
     annonce_ids = []
