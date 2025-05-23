@@ -4,34 +4,30 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
-    ports:
-      - "2181:2181"
+    ports: ["2181:2181"]
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    networks:
-      - dari_rec_system_network
+    networks: [dari_rec_system_network]
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    ports:
-      - "9092:9092"
+    container_name: kafka
+    ports: ["9092:9092", "9093:9093"]
     environment:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    depends_on:
-      - zookeeper
-    networks:
-      - dari_rec_system_network
+    depends_on: [zookeeper]
+    networks: [dari_rec_system_network]
 
   redis:
-    image: redis:latest
+    image: redis:7.2-alpine
     container_name: redis
-    ports:
-      - "6379:6379"
-    networks:
-      - dari_rec_system_network
+    ports: ["6379:6379"]
+    networks: [dari_rec_system_network]
 
   mysql:
     image: mysql:latest
@@ -41,88 +37,78 @@ services:
       MYSQL_USER: admin
       MYSQL_PASSWORD: admin
       MYSQL_DATABASE: dari_db
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - dari_rec_system_network
+    ports: ["3306:3306"]
+    volumes: [mysqlc-data:/var/lib/mysql]
+    networks: [dari_rec_system_network]
 
   airflow-webserver:
-     build:
+    build:
       context: .
       dockerfile: Dockerfile.airflow
-     command: webserver; airflow db init;
-     environment:
+    command: bash -c " airflow db upgrade && airflow users create \ --username admin \ --firstname Admin \ --lastname User \ --role Admin \ --email admin@example.com \ --password admin_password && airflow webserver "
+    ports: ["8080:8080"]
+    networks:
+      - dari_rec_system_network
+    environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: mysql+mysqldb://admin:admin@mysqlc/dari_db
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CELERY__RESULT_BACKEND: db+mysql://admin:admin@mysqlc/dari_db
-     volumes:
-      - ./dags:/opt/airflow/dags
-     ports:
-      - "8082:8080"
-     depends_on:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+
+    depends_on:
+      - mysql
       - redis
       - kafka
-      - mysql
-     networks:
-      - dari_rec_system_network
 
   airflow-scheduler:
     build:
       context: .
       dockerfile: Dockerfile.airflow
-    command: scheduler
+    command:  bash -c "airflow scheduler"
+    networks:
+      - dari_rec_system_network
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./jars:/opt/spark/jars
+      - ./spark:/opt/spark
     environment:
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: mysql+mysqldb://admin:admin@mysqlc/dari_db
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CELERY__RESULT_BACKEND: db+mysql://admin:admin@mysqlc/dari_db
-    volumes:
-      - ./dags:/opt/airflow/dags
     depends_on:
       - airflow-webserver
-      - kafka
-      - mysql
-    networks:
-      - dari_rec_system_network
-
-
 
   spark-master:
-    build:
+    build: 
       context: .
       dockerfile: Dockerfile.master-spark
-    environment:
+    container_name: spark-master
+    environment: 
       - SPARK_MODE=master
-    ports:
-      - "7077:7077"
-      - "8081:8080"
+    ports: ["7077:7077", "8081:8080","5000:5000"]
+    networks: [dari_rec_system_network]
     volumes:
-      - ./dags:/opt/airflow/dags
-    depends_on:
-      - kafka
-    networks:
-      - dari_rec_system_network
+      - ./scheduler:/opt/spark/scheduler
+
 
   spark-worker:
-    build:
+    build: 
       context: .
       dockerfile: Dockerfile.worker-spark
+    container_name: spark-worker
     environment:
       - SPARK_MODE=worker
+      - SPARK_WORKER_MEMORY=4g
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_INSTANCES=1
       - SPARK_MASTER_URL=spark://spark-master:7077
-    depends_on:
-      - spark-master
-      - kafka
-    networks:
-      - dari_rec_system_network
+    depends_on: [spark-master]
+    networks: [dari_rec_system_network]
 
 volumes:
-  airflow-dags-volume:
-  redis-db-volume:
-  mysql-data:
+  mysqlc-data:
 
 networks:
   dari_rec_system_network:

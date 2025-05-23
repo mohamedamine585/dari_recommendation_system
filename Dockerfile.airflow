@@ -1,25 +1,44 @@
-FROM apache/airflow:2.8.0-python3.9
+FROM apache/airflow:2.10.4
 
+# Install system dependencies first as root
 USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jdk \
+    krb5-user \
+    libkrb5-dev \
+    gcc \
+    make \
+    procps \
+    curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y default-libmysqlclient-dev gcc openjdk-17-jdk && rm -rf /var/lib/apt/lists/*
+# Set up Spark environment
+ENV SPARK_HOME="/opt/spark"
+ENV JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
+ENV PATH="${JAVA_HOME}:${SPARK_HOME}/bin:${SPARK_HOME}/sbin:${PATH}"
 
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH="$JAVA_HOME/bin:$PATH"
+# Port master will be exposed
+ENV SPARK_MASTER_PORT="7077"
+# Name of master container and also counts as hostname
+ENV SPARK_MASTER_HOST="spark-master"
 
+RUN mkdir -p ${SPARK_HOME}
+
+
+# Copy custom configuration for master url and events logging
+COPY ./spark-defaults.conf "${SPARK_HOME}/conf"
+RUN chown -R airflow ${SPARK_HOME}
+
+# Switch back to airflow user for Airflow-specific installations
 USER airflow
 
-RUN pip install --upgrade pip setuptools wheel
+# Install Airflow providers and upgrade DB
+RUN pip install --no-cache-dir apache-airflow-providers-apache-spark
+RUN airflow db upgrade
 
-COPY ./dags /opt/airflow/dags
+# Install kerberos package separately with build dependencies
+RUN pip install --no-cache-dir 'apache-airflow[kerberos]'
 
-USER root
-
-COPY entryPoint.sh /entrypoint.sh
-RUN chmod 755 /entrypoint.sh
-
-WORKDIR /opt/airflow
-
-ENTRYPOINT ["/entrypoint.sh"]
-
-USER airflow
+RUN curl https://dlcdn.apache.org/spark/spark-3.5.5/spark-3.5.5-bin-hadoop3.tgz -o spark-3.5.5-bin-hadoop3.tgz \
+    && tar xvzf spark-3.5.5-bin-hadoop3.tgz --directory ${SPARK_HOME} --strip-components 1 \
+    && rm -rf spark-3.5.5-bin-hadoop3.tgz

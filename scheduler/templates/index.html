@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Recent Job Executions</h2>
+        
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Job ID</th>
+                        <th>Job Name</th>
+                        <th>Start Time</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exec in executions %}
+                    <tr>
+                        <td>{{ exec.id }}</td>
+                        <td>{{ exec.job_name }}</td>
+                        <td>{{ exec.start_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>
+                            {% if exec.end_time %}
+                                {{ (exec.end_time - exec.start_time).total_seconds() | round(2) }}s
+                            {% else %}
+                                Running...
+                            {% endif %}
+                        </td>
+                        <td class="status-{{ exec.status.lower() }}">{{ exec.status }}</td>
+                        <td>
+                            <a href="{{ url_for('job_details', job_id=exec.id) }}" class="btn btn-sm btn-info">Details</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

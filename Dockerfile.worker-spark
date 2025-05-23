@@ -3,3 +3,4 @@ FROM bitnami/spark:3.1.2
 
 
 COPY ./dags /opt/spark/dags
+
