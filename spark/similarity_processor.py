@@ -5,6 +5,8 @@ from pyspark.ml import Pipeline, PipelineModel
 from pyspark.sql.functions import col, from_json, lit, expr
 from pyspark.sql.types import StructType, IntegerType, FloatType, StringType
 from pyspark.sql import functions as F
+from pyspark.sql.types import StructType, StructField, IntegerType, ArrayType, StringType
+
 import os
 
 # --- Config ---
@@ -23,7 +25,14 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # --- Schema for input message ---
-input_schema = StructType().add("id", IntegerType())
+input_schema = StructType().add("announceId", StringType())
+
+schema = StructType([
+    StructField("announceId", IntegerType(), False),
+    StructField("similarIds", ArrayType(IntegerType()), False),
+    StructField("clusterId", StringType(), False)
+])
+
 
 # --- Data Loading and Preprocessing ---
 def load_and_preprocess_data():
@@ -122,7 +131,7 @@ normalized_df = model.transform(initial_df).cache()
 # --- Streaming Processing ---
 # --- Streaming Processing ---
 def process_batch(batch_df, batch_id):
-    ids = [row["id"] for row in batch_df.collect()]
+    ids = [row["announceId"] for row in batch_df.collect()]
     if not ids:
         return
     
@@ -151,10 +160,14 @@ def process_batch(batch_df, batch_id):
             similar_ids = [r["id"] for r in similar_annonces.select("id").collect()]
             
             # Prepare output
+            similar_ids = [int(r["id"]) for r in similar_annonces.select("id").collect()]  # Cast similarIds to int/long
+            annonce_id = int(annonce_id)  # Cast announceId to int/long
+            
             result = spark.createDataFrame(
-                [(annonce_id, str(similar_ids), float(cluster))],
-                ["announceId", "similarIds", "clusterId"]
-            )
+               [(annonce_id, similar_ids, str(cluster))],
+                schema=schema
+               )
+
             
             for row in similar_annonces.collect():
                 print(f"Annonce ID: {row['id']}, Similarity: {row['prix']}")
@@ -174,13 +187,13 @@ def process_batch(batch_df, batch_id):
 incoming_stream = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", kafka_bootstrap) \
+    .option("startingOffsets", "earliest") \
     .option("subscribe", input_topic) \
-    .option("startingOffsets", "latest") \
     .load()
 
 parsed_stream = incoming_stream.selectExpr("CAST(value AS STRING)") \
     .select(from_json("value", input_schema).alias("data")) \
-    .select("data.id")
+    .select("data.announceId")
 
 query = parsed_stream.writeStream \
     .foreachBatch(process_batch) \

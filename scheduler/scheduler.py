@@ -41,7 +41,7 @@ def send_spark_command():
         db.session.add(job)
         db.session.commit()
 
-        command = "spark-submit --packages mysql:mysql-connector-java:8.0.28 recommendation_job.py"
+        command = "spark-submit --packages mysql:mysql-connector-java:8.0.28 /opt/spark/recommendation_job.py"
         try:
             logger.info(f"Sending command to receiver: {command}")
             response = requests.post("http://localhost:5000/execute", json={"command": command})
