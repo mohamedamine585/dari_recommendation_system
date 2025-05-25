@@ -1,8 +1,9 @@
-
 pyspark==3.1.2
-mysqlclient==2.2.1
 pandas
 flask
 apscheduler
 flask_sqlalchemy
-datetime
+mysql-connector-python
+numpy
+faker
+pymysql

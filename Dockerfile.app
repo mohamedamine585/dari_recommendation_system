@@ -1,33 +1,36 @@
-# Lightweight Python base
 FROM python:3.9-slim
 
 # Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     default-libmysqlclient-dev \
-    pkg-config \
     build-essential \
-    openjdk-17-jdk-headless \
-    apt-transport-https \
-    ca-certificates \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Set Java environment variables
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH="$JAVA_HOME/bin:$PATH"
-
-# Create app directory
+# Set working directory
 WORKDIR /app
 
-# Install Python packages
+# Copy requirements first for better caching
 COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install mysql-connector-python
 # Copy application code
-COPY ./scheduler .
+COPY ./scheduler ./scheduler
+COPY ./spark ./spark
 
 
-# Set entrypoint
-CMD ["python", "scheduler.py"]
+
+RUN pip install requests
+# Set environment variables with defaults
+ENV RECEIVER_HOST=http://dari/spark
+ENV MYSQL_HOST=mysql
+ENV MYSQL_USER=spark_user
+ENV MYSQL_PASS=spark_pass
+ENV MYSQL_DB=spark_scheduler
+
+
+EXPOSE 5001
+
+# Run the scheduler
+CMD ["python", "scheduler/scheduler.py"]

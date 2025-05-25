@@ -1,14 +1,22 @@
 import logging
 from datetime import datetime, timezone
 import requests
+import os
 
 from flask import Flask, render_template, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from apscheduler.schedulers.background import BackgroundScheduler
 
+# Configuration
+RECEIVER_HOST = os.getenv('RECEIVER_HOST', 'http://localhost:5000')
+MYSQL_HOST = os.getenv('MYSQL_HOST', 'localhost')
+MYSQL_USER = os.getenv('MYSQL_USER', 'spark_user')
+MYSQL_PASS = os.getenv('MYSQL_PASS', 'spark_pass')
+MYSQL_DB = os.getenv('MYSQL_DB', 'spark_scheduler')
+
 # Configuration Flask
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://spark_user:spark_pass@localhost/spark_scheduler'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASS}@{MYSQL_HOST}/{MYSQL_DB}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Logging
@@ -44,7 +52,7 @@ def send_spark_command():
         command = "spark-submit --packages mysql:mysql-connector-java:8.0.28 /opt/spark/recommendation_job.py"
         try:
             logger.info(f"Sending command to receiver: {command}")
-            response = requests.post("http://localhost:5000/execute", json={"command": command})
+            response = requests.post(f"{RECEIVER_HOST}/execute", json={"command": command})
             response.raise_for_status()
             result = response.json()
 
@@ -61,21 +69,21 @@ def send_spark_command():
 
 # Scheduler (toutes les 10 minutes)
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=send_spark_command, trigger="interval", minutes=10)
+scheduler.add_job(func=send_spark_command, trigger="interval", minutes=1)
 scheduler.start()
 
 # Routes
-@app.route('/')
+@app.route('/scheduler')
 def index():
     executions = JobExecution.query.order_by(JobExecution.start_time.desc()).limit(20).all()
     return render_template("index.html", executions=executions)
 
-@app.route('/job/<int:job_id>')
+@app.route('/scheduler/job/<int:job_id>')
 def job_details(job_id):
     execution = JobExecution.query.get_or_404(job_id)
     return render_template("job_details.html", execution=execution)
 
-@app.route('/api/trigger', methods=['POST'])
+@app.route('/scheduler/api/trigger', methods=['POST'])
 def manual_trigger():
     send_spark_command()
     return jsonify({"status": "ok", "message": "Job manually triggered"}), 200

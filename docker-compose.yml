@@ -42,50 +42,9 @@ services:
     volumes: [mysqlc-data:/var/lib/mysql]
     networks: [dari_rec_system_network]
 
-  airflow-webserver:
-    build:
-      context: .
-      dockerfile: Dockerfile.airflow
-    command: bash -c " airflow db upgrade && airflow users create \ --username admin \ --firstname Admin \ --lastname User \ --role Admin \ --email admin@example.com \ --password admin_password && airflow webserver "
-    ports: ["8080:8080"]
-    networks:
-      - dari_rec_system_network
-    environment:
-      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: mysql+mysqldb://admin:admin@mysqlc/dari_db
-      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+mysql://admin:admin@mysqlc/dari_db
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-
-    depends_on:
-      - mysql
-      - redis
-      - kafka
-
-  airflow-scheduler:
-    build:
-      context: .
-      dockerfile: Dockerfile.airflow
-    command:  bash -c "airflow scheduler"
-    networks:
-      - dari_rec_system_network
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./jars:/opt/spark/jars
-      - ./spark:/opt/spark
-    environment:
-      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: mysql+mysqldb://admin:admin@mysqlc/dari_db
-      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+mysql://admin:admin@mysqlc/dari_db
-    depends_on:
-      - airflow-webserver
 
   spark-master:
-    build: 
-      context: .
-      dockerfile: Dockerfile.master-spark
-    container_name: spark-master
+    image: mohamedaminelili02/spark-master:1.0.0
     environment: 
       - SPARK_MODE=master
     ports: ["7077:7077", "8081:8080","5000:5000"]
@@ -93,21 +52,52 @@ services:
     volumes:
       - ./scheduler:/opt/spark/scheduler
       - ./spark:/opt/spark
+    depends_on:
+      - mysql
+      
 
 
   spark-worker:
-    build: 
-      context: .
-      dockerfile: Dockerfile.worker-spark
+    image: bitnami/spark:3.1.2
     container_name: spark-worker
     environment:
       - SPARK_MODE=worker
-      - SPARK_WORKER_MEMORY=4g
+      - SPARK_WORKER_MEMORY=2g
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_INSTANCES=1
-      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_MASTER_IP=spark-master
+
     depends_on: [spark-master]
     networks: [dari_rec_system_network]
+  
+  dari:
+    image: mohamedaminelili02/dari-front:1.0.0
+    container_name: frontend
+    ports: ["80:80"]
+    networks: [dari_rec_system_network]
+    environment:
+      - API_BASE_URL=http://dari/api
+    depends_on:
+      - dari-server  
+  dari-server:
+    image: mohamedaminelili02/dari-server:1.0.0
+    container_name: backend
+    ports: ["8080:8080"]
+    networks: [dari_rec_system_network]
+    environment:
+      - KAFKA_ENABLED=false
+    depends_on:
+      - mysql
+      - kafka
+  scheduler:
+    image: mohamedaminelili02/scheduler-app:1.0.0
+    container_name: scheduler-app
+    ports: ["5001:5001"]
+    networks: [dari_rec_system_network]
+    depends_on:
+      - spark-master
+      - mysql
+
 
 volumes:
   mysqlc-data:

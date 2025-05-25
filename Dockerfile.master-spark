@@ -8,8 +8,8 @@ USER root
 WORKDIR /
 
 # Copy requirements file and install Python dependencies
-COPY ./libs.txt .
-RUN pip install --no-cache-dir --timeout=300 -r libs.txt
+COPY ./requirements.txt .
+RUN pip install --no-cache-dir --timeout=300 -r requirements.txt
 
 # Install OpenJDK 11
 RUN apt-get update && \
@@ -24,7 +24,14 @@ ENV PATH=$JAVA_HOME/bin:$PATH
 
 # Copy Spark job code and any other necessary files
 COPY ./spark /
+COPY ./scheduler /scheduler
+
+
 
 # Copy the JDBC connector jar
 COPY ./jars/mysql-connector-j-9.3.0.jar /
 
+
+COPY spark-master-startup.sh /spark-master-startup.sh
+RUN chmod +x /spark-master-startup.sh
+ENTRYPOINT ["/spark-master-startup.sh"]

@@ -1,14 +1,43 @@
+import pymysql
 from pyspark.sql import SparkSession
 from pyspark.ml.recommendation import ALS
-from pyspark.sql.functions import col, explode
-from pyspark.sql.types import FloatType, IntegerType
 from pyspark.sql.functions import col, explode, avg
+from pyspark.sql.types import FloatType, IntegerType
 from datetime import datetime
+
+def reset_user_recommendations_table():
+    print("Resetting user_recommendations table...")
+    conn = pymysql.connect(
+        host='mysql',
+        user='admin',
+        password='admin',
+        database='dari_db',
+        cursorclass=pymysql.cursors.DictCursor
+    )
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DROP TABLE IF EXISTS user_recommendations;")
+            create_table_sql = """
+            CREATE TABLE user_recommendations (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                annonce_id INT NOT NULL,
+                rating FLOAT NOT NULL
+            );
+            """
+            cursor.execute(create_table_sql)
+            conn.commit()
+        print("Table user_recommendations reset successfully.")
+    except Exception as e:
+        print(f"Error resetting table: {e}")
+        raise
+    finally:
+        conn.close()
 
 def run_recommendation_job(spark, job_id):
     try:
-        # Initialize Spark session
-        # Instead of creating a new SparkSession, use the one passed in
+        # Reset the recommendations table before inserting new data
+        reset_user_recommendations_table()
 
         # DB connection config
         db_properties = {
@@ -18,7 +47,6 @@ def run_recommendation_job(spark, job_id):
         }
         jdbc_url = "jdbc:mysql://mysql:3306/dari_db"
 
-        # Load data from MySQL
         print("Loading data from MySQL...")
         interaction_df = spark.read.jdbc(
             url=jdbc_url,
@@ -26,7 +54,6 @@ def run_recommendation_job(spark, job_id):
             properties=db_properties
         )
 
-        # Prepare ALS data (interaction data with proper types)
         als_data = interaction_df.select(
             col("user_id").cast(IntegerType()),
             col("annonce_id").cast(IntegerType()),
@@ -36,8 +63,6 @@ def run_recommendation_job(spark, job_id):
         )
 
         print("Training recommendation model...")
-
-        # Configure ALS model
         als = ALS(
             userCol="user_id",
             itemCol="annonce_id",
@@ -49,17 +74,14 @@ def run_recommendation_job(spark, job_id):
         )
         als_model = als.fit(als_data)
 
-        # --- Save the trained ALS model to disk ---
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         als_model_path = f"/app/models/als_model_{timestamp}"
         als_model.save(als_model_path)
         print(f"ALS model saved to {als_model_path}")
 
-        # Generate recommendations for all users
         print("Generating recommendations...")
         user_recommendations = als_model.recommendForAllUsers(100)
 
-        # Transform the recommendations to a MySQL-compatible format
         print("Transforming recommendations for database storage...")
         recommendations_exploded = user_recommendations.select(
             "user_id",
@@ -70,27 +92,22 @@ def run_recommendation_job(spark, job_id):
             col("recommendation.rating").alias("rating")
         )
 
-        # Save recommendations to database
         print("Saving recommendations to database...")
         recommendations_exploded.write.jdbc(
             url=jdbc_url,
             table="user_recommendations",
-            mode="append",
+            mode="append",  # safe to append since table was reset
             properties=db_properties
         )
 
         print("Process completed successfully!")
-        # Return True if successful, False otherwise
         return True
     except Exception as e:
         print(f"Error in recommendation job: {str(e)}")
         return False
 
-spark = SparkSession.builder \
-    .appName("DariRecommendationSystem") \
-    .getOrCreate()
-
-job_id = "example_job_id"
-run_recommendation_job(spark, job_id)
-
-spark.stop()
+if __name__ == "__main__":
+    spark = SparkSession.builder.appName("DariRecommendationSystem").getOrCreate()
+    job_id = "example_job_id"
+    run_recommendation_job(spark, job_id)
+    spark.stop()

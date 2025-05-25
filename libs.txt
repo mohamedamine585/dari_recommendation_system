@@ -1,5 +1,0 @@
-mysql-connector-python
-numpy
-pandas
-pyspark
-faker

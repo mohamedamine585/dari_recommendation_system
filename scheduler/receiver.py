@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-@app.route('/execute', methods=['POST'])
+@app.route('/spark/execute', methods=['POST'])
 def execute_command():
     try:
         data = request.get_json()
