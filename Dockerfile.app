@@ -21,13 +21,13 @@ COPY ./spark ./spark
 
 
 
-RUN pip install requests
+RUN pip install requests cryptography
 # Set environment variables with defaults
 ENV RECEIVER_HOST=http://dari/spark
 ENV MYSQL_HOST=mysql
-ENV MYSQL_USER=spark_user
-ENV MYSQL_PASS=spark_pass
-ENV MYSQL_DB=spark_scheduler
+ENV MYSQL_USER=admin
+ENV MYSQL_PASS=admin
+ENV MYSQL_DB=dari_db
 
 
 EXPOSE 5001

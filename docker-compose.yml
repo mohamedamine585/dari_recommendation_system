@@ -39,8 +39,9 @@ services:
       MYSQL_PASSWORD: admin
       MYSQL_DATABASE: dari_db
     ports: ["3306:3306"]
-    volumes: [mysqlc-data:/var/lib/mysql]
-    networks: [dari_rec_system_network]
+    volumes: [mysql-data:/var/lib/mysql]
+
+
 
 
   spark-master:
@@ -85,7 +86,7 @@ services:
     ports: ["8080:8080"]
     networks: [dari_rec_system_network]
     environment:
-      - KAFKA_ENABLED=false
+      - KAFKA_ENABLED=true
     depends_on:
       - mysql
       - kafka
@@ -100,7 +101,7 @@ services:
 
 
 volumes:
-  mysqlc-data:
+  mysql-data:
 
 networks:
   dari_rec_system_network:

@@ -10,13 +10,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 # Configuration
 RECEIVER_HOST = os.getenv('RECEIVER_HOST', 'http://localhost:5000')
 MYSQL_HOST = os.getenv('MYSQL_HOST', 'localhost')
-MYSQL_USER = os.getenv('MYSQL_USER', 'spark_user')
-MYSQL_PASS = os.getenv('MYSQL_PASS', 'spark_pass')
-MYSQL_DB = os.getenv('MYSQL_DB', 'spark_scheduler')
+MYSQL_USER = os.getenv('MYSQL_USER', 'admin')
+MYSQL_PASS = os.getenv('MYSQL_PASS', 'admin')
+MYSQL_DB = os.getenv('MYSQL_DB', 'dari_db')
 
 # Configuration Flask
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASS}@{MYSQL_HOST}/{MYSQL_DB}'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASS}@{MYSQL_HOST}:3306/{MYSQL_DB}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Logging
