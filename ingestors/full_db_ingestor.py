@@ -1,30 +1,14 @@
-import pymysql
-from faker import Faker
-import random
+# ... All imports and get_positive_input stay the same ...
 
-def get_positive_input(prompt, default=1):
-    """Get positive integer input from user with validation"""
-    while True:
-        try:
-            user_input = int(input(f"{prompt} [{default}]: ") or default)
-            if user_input < 1:
-                print("Please enter a number greater than 0")
-                continue
-            return user_input
-        except ValueError:
-            print("Please enter a valid number")
-
-# Get user input with validation
+# Get user input
 print("=== Database Population Settings ===")
 num_users = get_positive_input("Enter number of users to create", 10)
 max_annonces_per_user = get_positive_input("Enter maximum annonces per user", 3)
 max_attachments_per_annonce = get_positive_input("Enter maximum attachments per annonce", 3)
-# max_searches_per_user = get_positive_input("Enter maximum searches per user", 2)  # DISABLED
 max_interactions_per_user = get_positive_input("Enter number of interactions per user", 5)
 
 faker = Faker()
 
-# Connect to MySQL
 try:
     conn = pymysql.connect(
         host='localhost',
@@ -35,21 +19,9 @@ try:
     )
     cursor = conn.cursor()
 
-    print("\n=== Resetting Database ===")
-    cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
-    cursor.execute("SHOW TABLES")
-    all_tables = [table[0] for table in cursor.fetchall()]
-    for table in all_tables:
-        try:
-            cursor.execute(f"DROP TABLE IF EXISTS {table}")
-            print(f"Dropped table {table}")
-        except Exception as e:
-            print(f"Error dropping table {table}: {e}")
-    cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
-
-    print("\n=== Creating Tables ===")
+    print("\n=== Creating Tables If Not Exist ===")
     cursor.execute("""
-    CREATE TABLE user (
+    CREATE TABLE IF NOT EXISTS user (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
@@ -60,14 +32,14 @@ try:
     )
     """)
     cursor.execute("""
-    CREATE TABLE user_roles (
+    CREATE TABLE IF NOT EXISTS user_roles (
         user_id BIGINT,
         roles VARCHAR(255),
         FOREIGN KEY (user_id) REFERENCES user(id)
     )
     """)
     cursor.execute("""
-    CREATE TABLE annonce (
+    CREATE TABLE IF NOT EXISTS annonce (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         titre VARCHAR(100) NOT NULL,
         description TEXT,
@@ -84,14 +56,14 @@ try:
     )
     """)
     cursor.execute("""
-    CREATE TABLE annonce_attachment_paths (
+    CREATE TABLE IF NOT EXISTS annonce_attachment_paths (
         annonce_id BIGINT,
         attachment_paths VARCHAR(255),
         FOREIGN KEY (annonce_id) REFERENCES annonce(id)
     )
     """)
     cursor.execute("""
-    CREATE TABLE usearch_query (
+    CREATE TABLE IF NOT EXISTS usearch_query (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         query TEXT,
         min_prix FLOAT,
@@ -108,7 +80,7 @@ try:
     )
     """)
     cursor.execute("""
-    CREATE TABLE user_interaction (
+    CREATE TABLE IF NOT EXISTS user_interaction (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         user_id BIGINT NOT NULL,
         annonce_id BIGINT NOT NULL,
@@ -129,27 +101,31 @@ try:
         telephone = faker.phone_number()
         nom = faker.name()
         active = 1
-        cursor.execute("""
-            INSERT INTO user (username, password, telephone, nom, active)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (username, password, telephone, nom, active))
-        user_id = cursor.lastrowid
-        user_ids.append(user_id)
-
-        user_roles = random.sample(roles, random.randint(1, 2))
-        for role in user_roles:
+        try:
             cursor.execute("""
-                INSERT INTO user_roles (user_id, roles)
-                VALUES (%s, %s)
-            """, (user_id, role))
-        print(f"Created user {i+1}/{num_users}: {username} with roles {', '.join(user_roles)}")
+                INSERT INTO user (username, password, telephone, nom, active)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (username, password, telephone, nom, active))
+            user_id = cursor.lastrowid
+            user_ids.append(user_id)
+
+            user_roles = random.sample(roles, random.randint(1, 2))
+            for role in user_roles:
+                cursor.execute("""
+                    INSERT INTO user_roles (user_id, roles)
+                    VALUES (%s, %s)
+                """, (user_id, role))
+            print(f"Created user {i+1}/{num_users}: {username} with roles {', '.join(user_roles)}")
+        except pymysql.err.IntegrityError:
+            print(f"Username {username} already exists. Skipping.")
+
+    # ... Continue inserting annonces and interactions as before ...
 
     TYPE_ANNONCE = ['VENTE', 'LOCATION']
     STATUS_ANNONCE = ['ACTIVE', 'INACTIVE', 'EN_ATTENTE']
     TYPE_BIEN = ['ANY', 'APARTMENT', 'HOUSE', 'VILLA', 'STUDIO', 'CONDO', 'TOWNHOUSE', 'PENTHOUSE', 'DUPLEX', 'LOFT', 'BUNGALOW', 'FARMHOUSE', 'COTTAGE']
     ROOMS = ['ANY', 'S1', 'S2', 'S3', 'S4', 'S5']
     LEASE_DURATIONS = ['ANY', 'DAY', 'WEEK', 'MONTH', 'SEMESTER', 'QUARTER', 'YEAR', 'FLEXIBLE']
-
 
     print(f"\n=== Inserting Annonces ===")
     annonce_ids = []
@@ -180,38 +156,10 @@ try:
                     VALUES (%s, %s)
                 """, (annonce_id, path))
 
-    # DISABLED: Insert search queries (can be re-enabled later)
-    # print(f"\n=== Inserting Search Queries ===")
-    # TYPE_ANNONCE_INT = {'VENTE': 0, 'LOCATION': 1, 'ECHANGE': 2}
-    # STATUS_ANNONCE_INT = {'ACTIVE': 0, 'INACTIVE': 1, 'EN_ATTENTE': 2}
-    # TYPE_BIEN_INT = {
-    #     'ANY': 0, 'APARTMENT': 1, 'HOUSE': 2, 'VILLA': 3, 'STUDIO': 4,
-    #     'CONDO': 5, 'TOWNHOUSE': 6, 'PENTHOUSE': 7, 'DUPLEX': 8,
-    #     'LOFT': 9, 'BUNGALOW': 10, 'FARMHOUSE': 11, 'COTTAGE': 12
-    # }
-    # for user_id in user_ids:
-    #     for _ in range(random.randint(1, max_searches_per_user)):
-    #         query = faker.sentence()
-    #         min_prix = round(random.uniform(5000, 15000), 2)
-    #         max_prix = round(random.uniform(min_prix + 1000, 30000), 2)
-    #         ann_type = random.choice(list(TYPE_ANNONCE_INT.values()))
-    #         status = random.choice(list(STATUS_ANNONCE_INT.values()))
-    #         lat = float(faker.latitude())
-    #         lng = float(faker.longitude())
-    #         radius = round(random.uniform(1.0, 50.0), 2)
-    #         room = random.randint(1, 5)
-    #         type_b = random.choice(list(TYPE_BIEN_INT.values()))
-    #         cursor.execute("""
-    #             INSERT INTO usearch_query 
-    #             (query, min_prix, max_prix, type, status_annonce, latitude, longitude, radius, rooms, type_bien, user_id)
-    #             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    #         """, (query, min_prix, max_prix, ann_type, status, lat, lng, radius, room, type_b, user_id))
-
     print("\n=== Generating User Interactions ===")
     interaction_types = ['VIEW', 'SAVE', 'CONTACT', 'RATING']
     for user_id in user_ids:
         for _ in range(max_interactions_per_user):
-            print(f"Generating interactions for user {user_id}")
             annonce_id = random.choice(annonce_ids)
             interaction_type = random.choice(interaction_types)
             interaction_score = round(random.uniform(0.1, 1.0), 2)
